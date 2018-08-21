@@ -12,5 +12,7 @@ namespace ContextLogger.Layouts
         public static string DefaultDateTimeFormat { get; set;  } = "yyyy-MM-dd HH:mm:ss";
         public static ReferenceLoopHandling ReferenceLoopHandling { get; set; } = ReferenceLoopHandling.Ignore;
         public static string[] SkippedProperties { get; set; } = null;
+
+        public static Func<Type, string, bool> AdvancedPropertyFilter = (type, prop) => false;
     }
 }

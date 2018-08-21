@@ -38,7 +38,7 @@ namespace ContextLogger.Layouts
             _initialized = false;
             InitializeSerialization(settingsOverride);
         }
-        
+
         private void InitializeSerialization(JsonSerializerSettings settingsOverride = null)
         {
             if (_initialized) return;
@@ -65,11 +65,16 @@ namespace ContextLogger.Layouts
                     DateTimeFormat = DateTimeFormat ?? JsonLayoutSettings.DefaultDateTimeFormat
                 };
                 _settings.Converters.Add(dateTimeConverter);
-                
-                if (!HasSkippedProperties()) return;
 
-                var skippedProperties = GetSkippedProperties();
-                _settings.ContractResolver = new ShouldSerializeContractResolver(skippedProperties);
+                if (HasSkippedProperties())
+                {
+                    var skippedProperties = GetSkippedProperties();
+                    _settings.ContractResolver = new ShouldSerializeContractResolver(skippedProperties);
+                }
+                else
+                {
+                    _settings.ContractResolver = new ShouldSerializeContractResolver(JsonLayoutSettings.AdvancedPropertyFilter);
+                }
             }
         }
 
@@ -106,6 +111,9 @@ namespace ContextLogger.Layouts
         {
             InitializeSerialization();
 
+
+            //PatternLayout d = new PatternLayout();
+
             var dic = new Dictionary<string, object>
             {
                 ["processSessionId"] = ProcessSessionId,
@@ -135,16 +143,28 @@ namespace ContextLogger.Layouts
         internal class ShouldSerializeContractResolver : DefaultContractResolver
         {
             private readonly string[] _skippedProperties;
+            private readonly Func<Type, string, bool> _advancedPropertyFilter;
 
             protected internal ShouldSerializeContractResolver(string[] skippedProperties)
             {
                 _skippedProperties = skippedProperties;
+                _advancedPropertyFilter = SimplePropertyFilter;
+            }
+
+            protected internal ShouldSerializeContractResolver(Func<Type, string, bool> advancedPropertyFilter)
+            {
+                _advancedPropertyFilter = advancedPropertyFilter;
+            }
+
+            private bool SimplePropertyFilter(Type declaringType, string propertyName)
+            {
+                return !_skippedProperties.Contains(propertyName);
             }
 
             protected override JsonProperty CreateProperty(MemberInfo member, MemberSerialization memberSerialization)
             {
                 var property = base.CreateProperty(member, memberSerialization);
-                property.ShouldSerialize = instance => !_skippedProperties.Contains(property.PropertyName);
+                property.ShouldSerialize = instance => _advancedPropertyFilter(property.DeclaringType, property.PropertyName);
                 return property;
             }
         }
