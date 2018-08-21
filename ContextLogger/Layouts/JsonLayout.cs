@@ -30,6 +30,7 @@ namespace ContextLogger.Layouts
         public JsonLayout()
         {
             ReferenceLoopHandling = JsonLayoutSettings.ReferenceLoopHandling;
+            LayoutScope = JsonLayoutSettings.LayoutScope;
             JsonLayoutStyle = JsonLayoutSettings.JsonLayoutStyle;
         }
 
@@ -64,13 +65,12 @@ namespace ContextLogger.Layouts
 
             if (e == null) throw new ArgumentNullException(nameof(e));
 
-            switch (JsonLayoutStyle)
+            switch (LayoutScope)
             {
-                case JsonLayoutStyle.Complete:
+                case LayoutScope.Record:
                     FormatComplete(writer, e);
                     break;
 
-                case JsonLayoutStyle.Message:
                 default:
                     FormatMessage(writer, e);
                     break;
@@ -132,30 +132,13 @@ namespace ContextLogger.Layouts
 
         private void FormatComplete(TextWriter writer, LoggingEvent e)
         {
-            var dic = new Dictionary<string, object>
+            Func<string, int, string, LoggingEvent, Dictionary<string, object>> createCompleteJsonData = JsonLayoutSettings.CreateCompleteJsonDataFull;
+            if (JsonLayoutStyle == JsonLayoutStyle.Simple)
             {
-                ["processSessionId"] = ProcessSessionId,
-                ["level"] = e.Level.DisplayName,
-                ["messageObject"] = e.MessageObject,
-                ["renderedMessage"] = e.RenderedMessage,
-                ["timestampUtc"] = e.TimeStamp.ToUniversalTime().ToString("O"),
-                ["logger"] = e.LoggerName,
-                ["thread"] = e.ThreadName,
-                ["exceptionObject"] = e.ExceptionObject,
-                ["exceptionObjectString"] = e.ExceptionObject == null ? null : e.GetExceptionString(),
-                ["userName"] = e.UserName,
-                ["domain"] = e.Domain,
-                ["identity"] = e.Identity,
-                ["location"] = e.LocationInformation.FullInfo,
-                ["pid"] = ProcessId,
-                ["machineName"] = MachineName,
-                ["workingSet"] = Environment.WorkingSet,
-                ["osVersion"] = Environment.OSVersion.ToString(),
-                ["is64bitOS"] = Environment.Is64BitOperatingSystem,
-                ["is64bitProcess"] = Environment.Is64BitProcess,
-                ["properties"] = e.GetProperties()
-            };
-            writer.Write(JsonConvert.SerializeObject(dic, _settings));
+                createCompleteJsonData = JsonLayoutSettings.CreateCompleteJsonDataCompact;
+            }
+            var data = createCompleteJsonData(ProcessSessionId, ProcessId, MachineName, e);
+            writer.Write(JsonConvert.SerializeObject(data, _settings));
             writer.WriteLine();
         }
 
@@ -204,9 +187,8 @@ namespace ContextLogger.Layouts
         public string DateTimeFormat { get; set; }
         public ReferenceLoopHandling ReferenceLoopHandling { get; set; }
         public string SkippedProperties { get; set; }
-
+        public LayoutScope LayoutScope { get; set; }
         public JsonLayoutStyle JsonLayoutStyle { get; set; }
-
         #endregion
     }
 }

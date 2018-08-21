@@ -50,6 +50,7 @@
     <Compile Include="Layouts\JsonLayout.cs" />
     <Compile Include="Layouts\JsonLayoutSettings.cs" />
     <Compile Include="Layouts\JsonLayoutStyle.cs" />
+    <Compile Include="Layouts\LayoutScope.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
