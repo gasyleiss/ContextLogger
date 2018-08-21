@@ -13,5 +13,7 @@ namespace GenericLogging.Types
         public int? NullableInt { get; set; }
 
         public Dictionary<string, int> Dict { get; set; }
+
+        public string Text { get; set; }
     }
 }

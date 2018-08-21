@@ -2,41 +2,79 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using log4net.Core;
 using log4net.Layout;
+using log4net.Layout.Pattern;
+using log4net.Util;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
-using System.Linq;
 
 namespace ContextLogger.Layouts
 {
-    public sealed class JsonLayout : LayoutSkeleton
+    public sealed class JsonLayout : PatternLayout
     {
         private const char PropertiesSeparator = ',';
 
         private static readonly string ProcessSessionId = Guid.NewGuid().ToString();
         private static readonly int ProcessId = Process.GetCurrentProcess().Id;
         private static readonly string MachineName = Environment.MachineName;
+        private readonly object _initializeLock = new object();
+        private volatile bool _initialized;
+        private PatternConverter _patternConverter;
 
         private JsonSerializerSettings _settings;
-        private readonly object _initializeLock = new object();
-        private volatile bool _initialized = false;
 
         public JsonLayout()
         {
             ReferenceLoopHandling = JsonLayoutSettings.ReferenceLoopHandling;
+            JsonLayoutStyle = JsonLayoutSettings.JsonLayoutStyle;
         }
 
         /// <summary>
-        /// Refresh serialization settings
+        ///     Refresh serialization settings
         /// </summary>
         /// <param name="settingsOverride">Specify this parameter to override completely the settings of serialization</param>
         public void UpdateSettings(JsonSerializerSettings settingsOverride = null)
         {
             _initialized = false;
             InitializeSerialization(settingsOverride);
+        }
+
+        public override void ActivateOptions()
+        {
+            // NB: this piece of code is taken from log4net source for PatternLayout
+
+            _patternConverter = CreatePatternParser(ConversionPattern).Parse();
+            for (var current = _patternConverter; current != null; current = current.Next)
+            {
+                if (!(current is PatternLayoutConverter patternLayoutConverter) || patternLayoutConverter.IgnoresException) continue;
+                IgnoresException = false;
+                break;
+            }
+        }
+
+        public override void Format(TextWriter writer, LoggingEvent e)
+        {
+            InitializeSerialization();
+
+            if (writer == null) throw new ArgumentNullException(nameof(writer));
+
+            if (e == null) throw new ArgumentNullException(nameof(e));
+
+            switch (JsonLayoutStyle)
+            {
+                case JsonLayoutStyle.Complete:
+                    FormatComplete(writer, e);
+                    break;
+
+                case JsonLayoutStyle.Message:
+                default:
+                    FormatMessage(writer, e);
+                    break;
+            }
         }
 
         private void InitializeSerialization(JsonSerializerSettings settingsOverride = null)
@@ -80,40 +118,20 @@ namespace ContextLogger.Layouts
 
         private string[] GetSkippedProperties()
         {
-            return string.IsNullOrWhiteSpace(SkippedProperties) 
-                ? JsonLayoutSettings.SkippedProperties 
-                : SkippedProperties.Split(PropertiesSeparator);
+            return string.IsNullOrWhiteSpace(SkippedProperties)
+                ? JsonLayoutSettings.SkippedProperties
+                : SkippedProperties.Split(PropertiesSeparator).Select(s => s.Trim()).ToArray();
         }
 
-        public override void ActivateOptions()
+        private bool HasSkippedProperties()
         {
-        }
-
-        public bool HasSkippedProperties()
-        {
-            if (string.IsNullOrWhiteSpace(SkippedProperties))
-            {
-                return JsonLayoutSettings.SkippedProperties != null && JsonLayoutSettings.SkippedProperties.Any();
-            }
+            if (string.IsNullOrWhiteSpace(SkippedProperties)) return JsonLayoutSettings.SkippedProperties != null && JsonLayoutSettings.SkippedProperties.Any();
 
             return SkippedProperties.Split(PropertiesSeparator).Any();
         }
 
-        #region Serialization configuration
-
-        public string DateTimeFormat { get; set; }
-        public ReferenceLoopHandling ReferenceLoopHandling { get; set; }
-        public string SkippedProperties { get; set; }
-
-        #endregion
-
-        public override void Format(TextWriter writer, LoggingEvent e)
+        private void FormatComplete(TextWriter writer, LoggingEvent e)
         {
-            InitializeSerialization();
-
-
-            //PatternLayout d = new PatternLayout();
-
             var dic = new Dictionary<string, object>
             {
                 ["processSessionId"] = ProcessSessionId,
@@ -138,12 +156,24 @@ namespace ContextLogger.Layouts
                 ["properties"] = e.GetProperties()
             };
             writer.Write(JsonConvert.SerializeObject(dic, _settings));
+            writer.WriteLine();
+        }
+
+        private void FormatMessage(TextWriter writer, LoggingEvent e)
+        {
+            var eventData = e.GetLoggingEventData();
+            eventData.Message = JsonConvert.SerializeObject(e.MessageObject, _settings);
+            var loggingEvent = new LoggingEvent(eventData);
+            for (var current = _patternConverter; current != null; current = current.Next)
+            {
+                current.Format(writer, loggingEvent);
+            }
         }
 
         internal class ShouldSerializeContractResolver : DefaultContractResolver
         {
-            private readonly string[] _skippedProperties;
             private readonly Func<Type, string, bool> _advancedPropertyFilter;
+            private readonly string[] _skippedProperties;
 
             protected internal ShouldSerializeContractResolver(string[] skippedProperties)
             {
@@ -168,5 +198,15 @@ namespace ContextLogger.Layouts
                 return property;
             }
         }
+
+        #region Serialization configuration
+
+        public string DateTimeFormat { get; set; }
+        public ReferenceLoopHandling ReferenceLoopHandling { get; set; }
+        public string SkippedProperties { get; set; }
+
+        public JsonLayoutStyle JsonLayoutStyle { get; set; }
+
+        #endregion
     }
 }

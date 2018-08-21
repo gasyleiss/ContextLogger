@@ -26,13 +26,15 @@ namespace GenericLogging
                 OtherData = new Data
                 {
                     Value = 12,
-                    Float = 12.345
+                    Float = 12.345,
+                    Text = "\" \\ / \b \f \n \r \t ."
                 },
                 Obj = new int[] {1, 2, 3},
                 NullableInt = 10,
-                Dict = new Dictionary<string, int> {{"aaaa", 1}, {"bbb", 2}}
+                Dict = new Dictionary<string, int> {{"aaaa", 1}, {"bbb", 2}},
+                Text = "simple text"
             };
-            data.OtherData = data;
+            data.OtherData.OtherData = data;
 
             _log.Debug(data);
             _log.Debug("log message");

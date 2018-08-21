@@ -14,5 +14,7 @@ namespace ContextLogger.Layouts
         public static string[] SkippedProperties { get; set; } = null;
 
         public static Func<Type, string, bool> AdvancedPropertyFilter = (type, prop) => false;
+
+        public static JsonLayoutStyle JsonLayoutStyle { get; set; } = JsonLayoutStyle.Message;
     }
 }
