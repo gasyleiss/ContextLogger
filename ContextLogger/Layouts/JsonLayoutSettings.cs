@@ -14,7 +14,7 @@ namespace ContextLogger.Layouts
         public static ReferenceLoopHandling ReferenceLoopHandling { get; set; } = ReferenceLoopHandling.Ignore;
         public static string[] SkippedProperties { get; set; } = null;
 
-        public static Func<Type, string, bool> AdvancedPropertyFilter = (type, prop) => false;
+        public static Func<Type, string, bool> AdvancedPropertyFilter = (type, prop) => true;
 
         public static LayoutScope LayoutScope { get; set; } = LayoutScope.Message;
         public static JsonLayoutStyle JsonLayoutStyle { get; set; } = JsonLayoutStyle.Complete;
