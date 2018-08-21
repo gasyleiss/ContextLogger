@@ -2,34 +2,110 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using ContextLogger.Serialization;
+using System.Reflection;
 using log4net.Core;
 using log4net.Layout;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Serialization;
+using System.Linq;
 
 namespace ContextLogger.Layouts
 {
-    public class JsonLayout : LayoutSkeleton
+    public sealed class JsonLayout : LayoutSkeleton
     {
+        private const char PropertiesSeparator = ',';
+
         private static readonly string ProcessSessionId = Guid.NewGuid().ToString();
         private static readonly int ProcessId = Process.GetCurrentProcess().Id;
         private static readonly string MachineName = Environment.MachineName;
-        private readonly JsonSerializerSettings _settings;
+
+        private JsonSerializerSettings _settings;
+        private readonly object _initializeLock = new object();
+        private volatile bool _initialized = false;
 
         public JsonLayout()
         {
-            _settings = new JsonSerializerSettings {ReferenceLoopHandling = ReferenceLoopHandling.Ignore};
-            _settings.Converters.Add(new IsoDateTimeConverter {DateTimeFormat = "yyyy-MM-dd HH:mm:ss"});
-            _settings.ContractResolver = new ShouldSerializeContractResolver();
+            ReferenceLoopHandling = JsonLayoutSettings.ReferenceLoopHandling;
+        }
+
+        /// <summary>
+        /// Refresh serialization settings
+        /// </summary>
+        /// <param name="settingsOverride">Specify this parameter to override completely the settings of serialization</param>
+        public void UpdateSettings(JsonSerializerSettings settingsOverride = null)
+        {
+            _initialized = false;
+            InitializeSerialization(settingsOverride);
+        }
+        
+        private void InitializeSerialization(JsonSerializerSettings settingsOverride = null)
+        {
+            if (_initialized) return;
+            lock (_initializeLock)
+            {
+                if (_initialized) return;
+
+                _initialized = true;
+                if (settingsOverride != null)
+                {
+                    _settings = settingsOverride;
+                    return;
+                }
+
+                // build from parameters of layout
+
+                _settings = new JsonSerializerSettings
+                {
+                    ReferenceLoopHandling = ReferenceLoopHandling
+                };
+
+                var dateTimeConverter = new IsoDateTimeConverter
+                {
+                    DateTimeFormat = DateTimeFormat ?? JsonLayoutSettings.DefaultDateTimeFormat
+                };
+                _settings.Converters.Add(dateTimeConverter);
+                
+                if (!HasSkippedProperties()) return;
+
+                var skippedProperties = GetSkippedProperties();
+                _settings.ContractResolver = new ShouldSerializeContractResolver(skippedProperties);
+            }
+        }
+
+        private string[] GetSkippedProperties()
+        {
+            return string.IsNullOrWhiteSpace(SkippedProperties) 
+                ? JsonLayoutSettings.SkippedProperties 
+                : SkippedProperties.Split(PropertiesSeparator);
         }
 
         public override void ActivateOptions()
         {
         }
 
+        public bool HasSkippedProperties()
+        {
+            if (string.IsNullOrWhiteSpace(SkippedProperties))
+            {
+                return JsonLayoutSettings.SkippedProperties != null && JsonLayoutSettings.SkippedProperties.Any();
+            }
+
+            return SkippedProperties.Split(PropertiesSeparator).Any();
+        }
+
+        #region Serialization configuration
+
+        public string DateTimeFormat { get; set; }
+        public ReferenceLoopHandling ReferenceLoopHandling { get; set; }
+        public string SkippedProperties { get; set; }
+
+        #endregion
+
         public override void Format(TextWriter writer, LoggingEvent e)
         {
+            InitializeSerialization();
+
             var dic = new Dictionary<string, object>
             {
                 ["processSessionId"] = ProcessSessionId,
@@ -54,6 +130,23 @@ namespace ContextLogger.Layouts
                 ["properties"] = e.GetProperties()
             };
             writer.Write(JsonConvert.SerializeObject(dic, _settings));
+        }
+
+        internal class ShouldSerializeContractResolver : DefaultContractResolver
+        {
+            private readonly string[] _skippedProperties;
+
+            protected internal ShouldSerializeContractResolver(string[] skippedProperties)
+            {
+                _skippedProperties = skippedProperties;
+            }
+
+            protected override JsonProperty CreateProperty(MemberInfo member, MemberSerialization memberSerialization)
+            {
+                var property = base.CreateProperty(member, memberSerialization);
+                property.ShouldSerialize = instance => !_skippedProperties.Contains(property.PropertyName);
+                return property;
+            }
         }
     }
 }
