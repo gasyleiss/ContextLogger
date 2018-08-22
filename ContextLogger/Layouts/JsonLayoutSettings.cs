@@ -1,8 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using log4net.Core;
 using Newtonsoft.Json;
 
@@ -23,12 +20,12 @@ namespace ContextLogger.Layouts
         {
             var dic = new Dictionary<string, object>
             {
+                ["logger"] = loggingEvent.LoggerName,
                 ["processSessionId"] = processSessionId,
                 ["level"] = loggingEvent.Level.DisplayName,
-                ["messageObject"] = loggingEvent.MessageObject,
+                ["message"] = loggingEvent.MessageObject,
                 ["renderedMessage"] = loggingEvent.RenderedMessage,
-                ["timestampUtc"] = loggingEvent.TimeStamp.ToUniversalTime().ToString(DefaultDateTimeFormat),
-                ["logger"] = loggingEvent.LoggerName,
+                ["timestamp"] = loggingEvent.TimeStamp.ToUniversalTime().ToString(DefaultDateTimeFormat),
                 ["thread"] = loggingEvent.ThreadName,
                 ["exceptionObject"] = loggingEvent.ExceptionObject,
                 ["exceptionObjectString"] = loggingEvent.ExceptionObject == null ? null : loggingEvent.GetExceptionString(),
@@ -51,10 +48,10 @@ namespace ContextLogger.Layouts
         {
             var dic = new Dictionary<string, object>
             {
-                ["level"] = loggingEvent.Level.DisplayName,
-                ["messageObject"] = loggingEvent.MessageObject,
-                ["timestampUtc"] = loggingEvent.TimeStamp.ToUniversalTime().ToString(DefaultDateTimeFormat),
                 ["logger"] = loggingEvent.LoggerName,
+                ["level"] = loggingEvent.Level.DisplayName,
+                ["message"] = loggingEvent.MessageObject,
+                ["timestamp"] = loggingEvent.TimeStamp.ToUniversalTime().ToString(DefaultDateTimeFormat),
                 ["thread"] = loggingEvent.ThreadName
             };
             return dic;

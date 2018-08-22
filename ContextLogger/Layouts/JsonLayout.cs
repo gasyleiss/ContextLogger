@@ -145,7 +145,10 @@ namespace ContextLogger.Layouts
         private void FormatMessage(TextWriter writer, LoggingEvent e)
         {
             var eventData = e.GetLoggingEventData();
-            eventData.Message = JsonConvert.SerializeObject(e.MessageObject, _settings);
+            if (!(e.MessageObject is SystemStringFormat))
+            {
+                eventData.Message = JsonConvert.SerializeObject(e.MessageObject, _settings);
+            }
             var loggingEvent = new LoggingEvent(eventData);
             for (var current = _patternConverter; current != null; current = current.Next)
             {

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
@@ -14,7 +15,6 @@ namespace GenericLogging
 {
     class Program
     {
-        //private static ILog _log = ContextLogManager.GetLogger(typeof(Program));
         private static readonly ILog _log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         static void Main(string[] args)
@@ -36,8 +36,24 @@ namespace GenericLogging
             };
             data.OtherData.OtherData = data;
 
+            // simple text
+            _log.Debug(new {info = "log message"});
+            _log.Debug(new {info = "log message"}, new Exception("exception message"));
+            _log.DebugFormat("log message {0}", DateTime.Now);
+            _log.DebugFormat("log message {0} {1}", new object[] { DateTime.Today, DateTime.Now });
+            _log.DebugFormat(CultureInfo.CurrentCulture, "log message {0} {1}", new object[] { DateTime.Today, DateTime.Now });
+            _log.DebugFormat("log message {0} {1}", DateTime.Today, DateTime.Now);
+            _log.DebugFormat("log message {0} {1} {2}", DateTime.Now.Date.Month, DateTime.Today, DateTime.Now);
+
+            // object
             _log.Debug(data);
-            _log.Debug("log message");
+            _log.Debug(new {obj = data, exc=new Exception("exception message")});
+            _log.DebugFormat("log message {0} {1}", DateTime.Now, data);
+            _log.DebugFormat("log message {0} {1} {2}", new object[] {DateTime.Today, DateTime.Now, data});
+            _log.DebugFormat(CultureInfo.CurrentCulture, "log message {0} {1} {2}", new object[] {DateTime.Today, DateTime.Now, data});
+            _log.DebugFormat("log message {0} {1} {2}", DateTime.Today, DateTime.Now, data);
+            _log.DebugFormat("log message {0} {1} {2} {3}", DateTime.Now.Date.Month, DateTime.Today, DateTime.Now, data);
+
             
         }
     }
