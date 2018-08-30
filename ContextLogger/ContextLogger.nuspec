@@ -8,7 +8,7 @@
     <owners>Alexander Goida</owners>
     <licenseUrl>https://github.com/xtrmstep/ContextLogger/blob/master/LICENSE</licenseUrl>
     <projectUrl>https://github.com/xtrmstep/ContextLogger</projectUrl>
-    <iconUrl>https://github.com/xtrmstep/ContextLogger/blob/master/log4net.png</iconUrl>
+    <iconUrl>https://github.com/xtrmstep/ContextLogger/blob/master/ContextLogger/log4net.png</iconUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Extensions for log4net layout</description>
     <releaseNotes>Extend log4net with simple configuration options to create JSON log entries.</releaseNotes>
