@@ -3,17 +3,51 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
+using System.Text;
+using ContextLogger.Layouts;
 using FluentAssert;
 using log4net;
+using log4net.Appender;
+using log4net.Config;
+using log4net.Core;
+using log4net.Layout;
+using log4net.Repository.Hierarchy;
 using Xunit;
 
 namespace ContextLogger.Tests.IntegrationTests
 {
     public class LogWritingTests
     {
-        ~LogWritingTests()
+        public LogWritingTests()
         {
-            File.Delete(@"c:\logs\LabourProductivity.log4net.Tests.log");
+            var hierarchy = (Hierarchy)LogManager.GetRepository();
+
+            var layout = new JsonLayout
+            {
+                //ConversionPattern = "%date [%thread] %-5level %logger - %message%newline",
+                //LayoutScope = LayoutScope.Record,
+                DateTimeFormat = "yyyy-MM-dd HH:mm:ss"
+            };
+            layout.ActivateOptions();
+
+            var fileName = Path.GetTempFileName();
+            fileName = Path.ChangeExtension(fileName, "log");
+
+            var roller = new RollingFileAppender
+            {
+                AppendToFile = false,
+                File = fileName,
+                Layout = layout,
+                MaxSizeRollBackups = 5,
+                MaximumFileSize = "1GB",
+                RollingStyle = RollingFileAppender.RollingMode.Once,
+                StaticLogFileName = true
+            };
+            roller.ActivateOptions();
+            hierarchy.Root.AddAppender(roller);
+
+            hierarchy.Root.Level = Level.All;
+            hierarchy.Configured = true;
         }
 
         // keep these commented lines for later usage. I'm very lazy and don't want to search them again and again.
@@ -41,7 +75,9 @@ namespace ContextLogger.Tests.IntegrationTests
             var now = DateTime.Now;
             var todayText = today.ToString("yyyy-MM-dd HH:mm:ss");
             var nowText = now.ToString("yyyy-MM-dd HH:mm:ss");
+
             var log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
             var data = new Data
             {
                 Value = 10,
@@ -76,7 +112,7 @@ namespace ContextLogger.Tests.IntegrationTests
             LogManager.Shutdown();
             
             // Assert
-            var lines = File.ReadAllLines(@"c:\logs\LabourProductivity.log4net.Tests.log");
+            var lines = File.ReadAllLines(@"c:\logs\ContextLogger.Tests.log");
             lines[0].ShouldBeEqualTo(@"{""info"":""log message 1""}");
             lines[1].ShouldBeEqualTo(@"{""info"":""log message 2""}");
             lines[2].ShouldBeEqualTo(@"System.Exception: exception message");
