@@ -47,6 +47,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Layouts\CompositeContractResolver.cs" />
     <Compile Include="Layouts\JsonLayout.cs" />
     <Compile Include="Layouts\JsonLayoutSettings.cs" />
     <Compile Include="Layouts\JsonLayoutStyle.cs" />

@@ -1,0 +1,5 @@
+nuget.exe spec
+nuget.exe pack ContextLogger.csproj -Properties Configuration=Release
+nuget.exe push ContextLogger.1.0.0.nupkg KEY -Source http://URL
+nuget.exe delete "ContextLogger" 1.0.0 -Source "http://URL" -ApiKey "KEY"
+nuget.exe list ContextLogger -AllVersions

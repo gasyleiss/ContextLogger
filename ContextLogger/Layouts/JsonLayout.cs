@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using log4net;
 using log4net.Core;
 using log4net.Layout;
 using log4net.Layout.Pattern;
@@ -14,8 +16,10 @@ using Newtonsoft.Json.Serialization;
 
 namespace ContextLogger.Layouts
 {
-    public sealed class JsonLayout : PatternLayout
+    public class JsonLayout : PatternLayout
     {
+        private static readonly ILog _log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
         private const char PropertiesSeparator = ',';
 
         private static readonly string ProcessSessionId = Guid.NewGuid().ToString();
@@ -65,14 +69,16 @@ namespace ContextLogger.Layouts
 
             if (e == null) throw new ArgumentNullException(nameof(e));
 
+            var loggingEvent = PreSerialization(e, LayoutScope);
+
             switch (LayoutScope)
             {
                 case LayoutScope.Record:
-                    FormatComplete(writer, e);
+                    FormatRecord(writer, loggingEvent);
                     break;
 
                 default:
-                    FormatMessage(writer, e);
+                    FormatMessage(writer, loggingEvent);
                     break;
             }
         }
@@ -98,21 +104,78 @@ namespace ContextLogger.Layouts
                     ReferenceLoopHandling = ReferenceLoopHandling
                 };
 
+                // add converters
+                var jsonConverters = CreateInstances<JsonConverter>(TypeConverters);
+                if (jsonConverters.Any())
+                {
+                    foreach (var jsonConverter in jsonConverters)
+                    {
+                        _settings.Converters.Add(jsonConverter);
+                    }
+                }
+                // add format
                 var dateTimeConverter = new IsoDateTimeConverter
                 {
                     DateTimeFormat = DateTimeFormat ?? JsonLayoutSettings.DefaultDateTimeFormat
                 };
                 _settings.Converters.Add(dateTimeConverter);
 
+                // add resolvers
+                var compositeResolver = new CompositeContractResolver();
                 if (HasSkippedProperties())
                 {
                     var skippedProperties = GetSkippedProperties();
-                    _settings.ContractResolver = new ShouldSerializeContractResolver(skippedProperties);
+                    compositeResolver.Add(new ShouldSerializeContractResolver(skippedProperties));
                 }
                 else
                 {
-                    _settings.ContractResolver = new ShouldSerializeContractResolver(JsonLayoutSettings.AdvancedPropertyFilter);
+                    compositeResolver.Add(new ShouldSerializeContractResolver(JsonLayoutSettings.AdvancedPropertyFilter));
                 }
+
+                var jsonResolvers = CreateInstances<IContractResolver>(ContractResolvers);
+                AddContractResolvers(compositeResolver, jsonResolvers);
+                _settings.ContractResolver = compositeResolver;
+            }
+        }
+
+        protected virtual IList<T> CreateInstances<T>(StringCollection typeConverters)
+        {
+            var list = new List<T>();
+            foreach (var typeConverter in typeConverters)
+            {
+                try
+                {
+                    var parts = typeConverter.Split(',');
+                    var typeName = parts[0];
+                    var assemblyName = parts[1];
+                    var instance = Activator.CreateInstance(assemblyName, typeName);
+                    if (instance.Unwrap() is T converter)
+                    {
+                        list.Add(converter);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // if there is any exception while crating a converter, then just don't use this converter
+                    _log.Error($"Converter of type '{typeConverter}' cannot be loaded. See error details.", ex);
+                }
+            }
+
+            return list;
+        }
+
+        protected virtual void AddContractResolvers(CompositeContractResolver compositeResolver, IList<IContractResolver> contractResolvers)
+        {
+            if (compositeResolver == null)
+            {
+                throw new ArgumentNullException(nameof(compositeResolver));
+            }
+
+            if (contractResolvers == null || contractResolvers.Count == 0) return;
+
+            foreach (var contractResolver in contractResolvers)
+            {
+                compositeResolver.Add(contractResolver);
             }
         }
 
@@ -130,29 +193,64 @@ namespace ContextLogger.Layouts
             return SkippedProperties.Split(PropertiesSeparator).Any();
         }
 
-        private void FormatComplete(TextWriter writer, LoggingEvent e)
+        private void FormatRecord(TextWriter writer, LoggingEvent e)
+        {
+            var data = GetData(e);
+            var serializedObject = SerializeObject(data);
+            writer.Write(serializedObject);
+            writer.WriteLine();
+        }
+
+        protected virtual Dictionary<string, object> GetData(LoggingEvent e)
         {
             Func<string, int, string, LoggingEvent, Dictionary<string, object>> createCompleteJsonData = JsonLayoutSettings.CreateCompleteJsonDataFull;
+
             if (JsonLayoutStyle == JsonLayoutStyle.Simple)
             {
                 createCompleteJsonData = JsonLayoutSettings.CreateCompleteJsonDataCompact;
             }
+
             var data = createCompleteJsonData(ProcessSessionId, ProcessId, MachineName, e);
-            writer.Write(JsonConvert.SerializeObject(data, _settings));
-            writer.WriteLine();
+            return data;
+        }
+
+        protected virtual LoggingEvent PreSerialization(LoggingEvent e, LayoutScope layoutScope)
+        {
+            var loggingEvent = e;
+            if (e.MessageObject is string)
+            {
+                return loggingEvent;
+            }
+
+            // prevent serialization to an empty representation
+            var message = SerializeObject(e.MessageObject);
+            if (message == "{}" || layoutScope == LayoutScope.Message)
+            {
+                // if serialization is not OK, then replace ObjectMessage with its rendered version
+                if (message == "{}")
+                {
+                    message = e.RenderedMessage;
+                }
+                loggingEvent = new LoggingEvent(null, e.Repository, e.LoggerName, e.Level, message, e.ExceptionObject);
+            }
+            else
+            {
+                // when serialization supposed to be OK, don't touch the event's MessageObject
+            }
+
+            return loggingEvent;
+        }
+
+        protected virtual string SerializeObject(object objectGraph)
+        {
+            return JsonConvert.SerializeObject(objectGraph, _settings);
         }
 
         private void FormatMessage(TextWriter writer, LoggingEvent e)
         {
-            var eventData = e.GetLoggingEventData();
-            if (!(e.MessageObject is SystemStringFormat))
-            {
-                eventData.Message = JsonConvert.SerializeObject(e.MessageObject, _settings);
-            }
-            var loggingEvent = new LoggingEvent(eventData);
             for (var current = _patternConverter; current != null; current = current.Next)
             {
-                current.Format(writer, loggingEvent);
+                current.Format(writer, e);
             }
         }
 
@@ -192,6 +290,9 @@ namespace ContextLogger.Layouts
         public string SkippedProperties { get; set; }
         public LayoutScope LayoutScope { get; set; }
         public JsonLayoutStyle JsonLayoutStyle { get; set; }
+        public StringCollection ContractResolvers { get; set; } = new StringCollection();
+        public StringCollection TypeConverters { get; set; } = new StringCollection();
+
         #endregion
     }
 }

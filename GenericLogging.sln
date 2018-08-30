@@ -7,6 +7,14 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GenericLogging", "GenericLo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ContextLogger", "ContextLogger\ContextLogger.csproj", "{1FA1C52D-1587-43FE-BC20-34F2F8E9D65A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ContextLogger.Tests", "ContextLogger.Tests\ContextLogger.Tests.csproj", "{5AE37506-4F49-40FB-8E95-4FD0DAFF7564}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "github", "github", "{0E0F6717-3AD1-4B13-B7F6-3DFC80C3A9E2}"
+	ProjectSection(SolutionItems) = preProject
+		LICENSE = LICENSE
+		README.md = README.md
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +29,10 @@ Global
 		{1FA1C52D-1587-43FE-BC20-34F2F8E9D65A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1FA1C52D-1587-43FE-BC20-34F2F8E9D65A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1FA1C52D-1587-43FE-BC20-34F2F8E9D65A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5AE37506-4F49-40FB-8E95-4FD0DAFF7564}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5AE37506-4F49-40FB-8E95-4FD0DAFF7564}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5AE37506-4F49-40FB-8E95-4FD0DAFF7564}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5AE37506-4F49-40FB-8E95-4FD0DAFF7564}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
